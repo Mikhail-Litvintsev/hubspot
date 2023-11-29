@@ -20,6 +20,8 @@ class DealSettingsParams
      *
      * @param int $user_id
      * @param int $block_id
+     * @param int $hs_contact_id
+     *
      * @return array
      */
     public function getForEdit(int $user_id, int $block_id, int $hs_contact_id): array
@@ -37,7 +39,9 @@ class DealSettingsParams
      * @param int $ticket_id
      * @param int $hs_contact_id
      * @param array $data
+     *
      * @return array
+     *
      * @throws GuzzleException
      * @throws HubspotApiException
      * @throws UserNotAuthenticatedException

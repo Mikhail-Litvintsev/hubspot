@@ -19,6 +19,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
+ *
  * @method static Builder|HubspotClient newModelQuery()
  * @method static Builder|HubspotClient newQuery()
  * @method static \Illuminate\Database\Query\Builder|HubspotClient onlyTrashed()

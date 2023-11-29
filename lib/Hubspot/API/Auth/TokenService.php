@@ -10,6 +10,7 @@ class TokenService
      * Преобразование TokenDTO в строку
      *
      * @param TokenDTO $tokenDTO
+     *
      * @return string
      */
     public function encodeToken(TokenDTO $tokenDTO): string
@@ -21,6 +22,7 @@ class TokenService
      * Получение TokenDTO из строки
      *
      * @param string $hubspotUserToken
+     *
      * @return TokenDTO
      */
     public function decodeToken(string $hubspotUserToken): TokenDTO

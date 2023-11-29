@@ -2,7 +2,6 @@
 
 namespace App\Services\Integrations\Hubspot;
 
-
 use UseDesk\Hubspot\Book\ScopeBook;
 
 class HubspotSettingsService

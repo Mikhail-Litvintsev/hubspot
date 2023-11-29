@@ -41,7 +41,7 @@ class ContactDealRequest extends FormRequest
         $error = [];
         foreach ($validator->errors()->toArray() as $key => $value) {
             $label = trans("text.hubspot.$key");
-            $error[$label] = implode(', ', $value);
+            $error[$label] = mb_strtolower(implode(', ', $value));
         }
         throw new HttpResponseException(response()->json([
             'errors' => $error,

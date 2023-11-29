@@ -14,7 +14,9 @@ class HubspotOwnerService extends ApiService
      *
      * @param int $user_id
      * @param int $block_id
+     *
      * @return array
+     *
      * @throws HubspotApiException
      * @throws UserNotAuthenticatedException|GuzzleException
      */
@@ -27,5 +29,5 @@ class HubspotOwnerService extends ApiService
             $result[$owner->id] = $ownerVO->toArray();
         }
         return $result;
-}
+    }
 }

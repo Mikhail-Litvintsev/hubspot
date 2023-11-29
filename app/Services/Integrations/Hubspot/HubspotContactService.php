@@ -7,7 +7,6 @@ use App\Exceptions\Integrations\Hubspot\HubspotApiException;
 use App\Exceptions\Integrations\Hubspot\UserNotAuthenticatedException;
 use App\Repositories\Integrations\HubspotClientRepository;
 use App\Repositories\Tickets\TicketRepository;
-use App\Services\Integrations\Hubspot\HtmlParams\IndexParams;
 use App\VO\Integrations\Hubspot\ContactVO;
 use GuzzleHttp\Exception\GuzzleException;
 use UseDesk\Hubspot\API\DTO\ContactDTO;
@@ -33,7 +32,9 @@ class HubspotContactService extends ApiService
      * @param int $block_id
      * @param int $user_id
      * @param int $hs_contact_id
+     *
      * @return array
+     *
      * @throws HubspotApiException
      * @throws UserNotAuthenticatedException|GuzzleException
      */
@@ -47,6 +48,7 @@ class HubspotContactService extends ApiService
      * Получение предзаполненных данных контакта внутри Юздеск
      *
      * @param int $ticket_id
+     *
      * @return array
      */
     public function getContactByTicketId(int $ticket_id): array
@@ -68,14 +70,16 @@ class HubspotContactService extends ApiService
      * @param int $user_id
      * @param int $block_id
      * @param array $contactData
+     *
      * @return array
+     *
      * @throws HubspotApiException
      * @throws UserNotAuthenticatedException|GuzzleException
      */
     public function createContact(int $user_id, int $block_id, array $contactData): array
     {
-        $contactData = array_filter(array_intersect_key($contactData, get_class_vars(ContactDTO::class)));
-        $newContact = $this->createApiClient($user_id, $block_id)->createContact(new ContactDTO(...$contactData));
+        $contactData = $this->prepareContactData($contactData);
+        $newContact = $this->createApiClient($user_id, $block_id)->createContact($contactData);
         return ContactVO::createFromDTO($newContact)->toArray();
     }
 
@@ -85,7 +89,9 @@ class HubspotContactService extends ApiService
      * @param int $user_id
      * @param int $block_id
      * @param ClientDTO $clientDTO
+     *
      * @return array
+     *
      * @throws HubspotApiException
      * @throws UserNotAuthenticatedException|GuzzleException
      */
@@ -107,9 +113,10 @@ class HubspotContactService extends ApiService
      *
      * @param int $block_id
      * @param int $client_id
-     * @return string|null
+     *
+     * @return int|null
      */
-    public function getLinkedContactId(int $block_id, int $client_id): ?string
+    public function getLinkedContactId(int $block_id, int $client_id): ?int
     {
         return $this->hubspotClientRepository->findFirst($block_id, $client_id)?->hs_contact_id;
     }
@@ -119,11 +126,28 @@ class HubspotContactService extends ApiService
      *
      * @param int $block_id
      * @param int $ticket_id
-     * @return string|null
+     *
+     * @return int|null
      */
-    public function getLinkedContactIdFromTicketId(int $block_id, int $ticket_id): ?string
+    public function getLinkedContactIdFromTicketId(int $block_id, int $ticket_id): ?int
     {
         $client_id = $this->ticketRepository->findClientByTicket($ticket_id)?->id;
         return ($client_id) ? $this->getLinkedContactId($block_id, $client_id) : null;
+    }
+
+    /**
+     * Подготовка данных контакта перед отправкой в Hubspot
+     *
+     * @param array $contactData
+     *
+     * @return ContactDTO
+     */
+    protected function prepareContactData(array $contactData): ContactDTO
+    {
+        if (empty($contactData['firstname'])) {
+            $contactData['firstname'] = $contactData['email'];
+        }
+        $contactData = array_filter(array_intersect_key($contactData, get_class_vars(ContactDTO::class)));
+        return new ContactDTO(...$contactData);
     }
 }

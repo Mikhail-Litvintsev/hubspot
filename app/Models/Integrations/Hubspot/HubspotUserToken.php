@@ -2,12 +2,8 @@
 
 namespace App\Models\Integrations\Hubspot;
 
-use App\User;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
-use UseDesk\Hubspot\API\DTO\TokenDTO;
 
 /**
  * App\Models\Integrations\Hubspot\HubspotUserToken
@@ -16,10 +12,11 @@ use UseDesk\Hubspot\API\DTO\TokenDTO;
  * @property int $block_id
  * @property string $hubspot_user_token_dto [json_encode(serialize(TokenDTO))]
  * @property string $code
- * @property int $expire_at [timestamp]
+ * @property Carbon|null $expire_at [timestamp]
  * @property int $id
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
+ *
  * @method static \Illuminate\Database\Eloquent\Builder|HubspotUserToken newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|HubspotUserToken newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|HubspotUserToken query()
@@ -32,8 +29,6 @@ use UseDesk\Hubspot\API\DTO\TokenDTO;
  */
 class HubspotUserToken extends Model
 {
-    use HasFactory;
-
     protected $fillable = [
         'user_id',
         'block_id',
@@ -45,7 +40,7 @@ class HubspotUserToken extends Model
     public function isValid(): bool
     {
         if ($this->hubspot_user_token_dto !== null) {
-            return $this->expire_at > \Carbon\Carbon::now()->addSeconds(10);
+            return \Carbon\Carbon::createFromFormat('Y-m-d H:i:s', $this->expire_at) > \Carbon\Carbon::now()->addSeconds(10);
         }
         return false;
     }

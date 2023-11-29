@@ -18,10 +18,12 @@ class HubspotServiceProvider extends ServiceProvider
     public function boot()
     {
         $this->app->bind(
-            OAuthClientInterface::class, OAuthClient::class
+            OAuthClientInterface::class,
+            OAuthClient::class
         );
         $this->app->bind(
-            ApiClientInterface::class, DiscoveryApiClient::class
+            ApiClientInterface::class,
+            DiscoveryApiClient::class
         );
 
     }

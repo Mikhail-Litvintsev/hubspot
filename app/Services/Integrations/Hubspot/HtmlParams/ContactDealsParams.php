@@ -32,24 +32,32 @@ class ContactDealsParams
      * @param int $block_id
      * @param int $ticket_id
      * @param int $hs_contact_id
+     * @param array|null $meta
+     *
      * @return array
+     *
+     * @throws GuzzleException
      * @throws HubspotApiException
      * @throws UserNotAuthenticatedException
-     * @throws GuzzleException
      */
-    public function getForContactDeals(int $user_id, int $block_id, int $ticket_id, int $hs_contact_id): array
+    public function getForContactDeals(int $user_id, int $block_id, int $ticket_id, int $hs_contact_id, ?array $meta = null): array
     {
-        $deals = $this->dealService->getDeals($user_id, $block_id, $hs_contact_id);
+        $meta = $this->dealService->getDealPaginationMeta($user_id, $block_id, $meta);
+        $deals = $this->dealService->getDeals($user_id, $block_id, $hs_contact_id, $meta);
         $is_linked = (bool)$this->contactService->getLinkedContactIdFromTicketId($block_id, $ticket_id);
         $contact = $this->contactService->getById($user_id, $block_id, $hs_contact_id);
-        return compact('hs_contact_id', 'deals', 'is_linked', 'contact');
+        $pipelines = $this->pipelineService->getAllWithIdKey($user_id, $block_id);
+
+        return compact('hs_contact_id', 'deals', 'is_linked', 'contact', 'pipelines');
     }
 
     /**
      * @param int $user_id
      * @param int $block_id
      * @param int $hs_contact_id
+     *
      * @return array
+     *
      * @throws HubspotApiException
      * @throws UserNotAuthenticatedException
      * @throws GuzzleException
@@ -76,7 +84,9 @@ class ContactDealsParams
      * @param int $ticket_id
      * @param int $hs_contact_id
      * @param array $request
+     *
      * @return array
+     *
      * @throws HubspotApiException
      * @throws UserNotAuthenticatedException|GuzzleException
      */
@@ -89,9 +99,13 @@ class ContactDealsParams
             $hs_contact_id,
             $request
         );
-        $comments = $this->commentsService->getCommentsByHsDealId($user_id, $block_id, $deal['hs_object_id']);
+        $meta = $this->dealService->getDealPaginationMeta($user_id, $block_id, null);
+        $sort = $this->dealService->getSort(null);
+        $comments = $this->commentsService->getCommentsByHsDealId(user_id: $user_id, block_id: $block_id, hs_deal_id: $deal['hs_object_id'], sort: $sort, meta: $meta);
         $owners = $this->ownerService->getAllWithIdKey($user_id, $block_id);
-        return  compact('deal', 'comments', 'owners', 'hs_contact_id');
+        $pipelines = $this->pipelineService->getAllWithIdKey($user_id, $block_id);
+
+        return  compact('deal', 'comments', 'owners', 'hs_contact_id', 'pipelines', 'sort');
     }
 
     /**
@@ -99,15 +113,24 @@ class ContactDealsParams
      * @param int $block_id
      * @param int $hs_deal_id
      * @param int $hs_contact_id
+     * @param array|null $meta
+     * @param string|null $sort
+     *
      * @return array
+     *
+     * @throws GuzzleException
      * @throws HubspotApiException
-     * @throws UserNotAuthenticatedException|GuzzleException
+     * @throws UserNotAuthenticatedException
      */
-    public function getForContactDealShow(int $user_id, int $block_id, int $hs_deal_id, int $hs_contact_id): array
+    public function getForContactDealShow(int $user_id, int $block_id, int $hs_deal_id, int $hs_contact_id, ?string $sort, ?array $meta, ?int $last_page_number,): array
     {
         $deal = $this->dealService->getDeal($user_id, $block_id, $hs_deal_id);
-        $comments = $this->commentsService->getCommentsByHsDealId($user_id, $block_id, $hs_deal_id);
+        $sort = $this->dealService->getSort($sort);
+        $meta = $this->dealService->getDealPaginationMeta($user_id, $block_id, $meta);
+        $comments = $this->commentsService->getCommentsByHsDealId(user_id: $user_id, block_id: $block_id, hs_deal_id: $hs_deal_id, sort: $sort, meta: $meta);
         $owners = $this->ownerService->getAllWithIdKey($user_id, $block_id);
-        return compact('deal', 'comments', 'owners', 'hs_contact_id');
+        $pipelines = $this->pipelineService->getAllWithIdKey($user_id, $block_id);
+
+        return compact('deal', 'comments', 'owners', 'hs_contact_id', 'pipelines', 'sort', 'last_page_number');
     }
 }

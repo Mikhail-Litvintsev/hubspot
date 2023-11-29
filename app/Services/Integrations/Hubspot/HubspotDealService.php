@@ -10,9 +10,19 @@ use App\VO\Integrations\Hubspot\DealVO;
 use Carbon\Carbon;
 use GuzzleHttp\Exception\GuzzleException;
 use UseDesk\Hubspot\API\DTO\DealDTO;
+use UseDesk\Hubspot\API\DTO\Pagination\Links;
+use UseDesk\Hubspot\API\DTO\Pagination\Meta;
+use UseDesk\Hubspot\API\DTO\Pagination\Response;
 
 class HubspotDealService extends ApiService
 {
+    public const PAGINATION_PER_PAGE = 5;
+    public const SORT_DEFAULT = 'ASC';
+    public const AVAILABLE_SORTS = [
+        self::SORT_DEFAULT,
+        'DESC'
+    ];
+
     protected HubspotClientRepository $hubspotClientRepository;
     protected HubspotUserSettingsRepository $hubspotUserSettingsRepository;
     public function __construct(AuthService $authService)
@@ -28,14 +38,17 @@ class HubspotDealService extends ApiService
      * @param int $user_id
      * @param int $block_id
      * @param int $hs_deal_id
+     *
      * @return array
+     *
      * @throws HubspotApiException
      * @throws UserNotAuthenticatedException|GuzzleException
      */
     public function getDeal(int $user_id, int $block_id, int $hs_deal_id): array
     {
         $deal = $this->createApiClient($user_id, $block_id)->getDeal($hs_deal_id);
-        return $this->getDealVOArrayTakingSettings($user_id, $block_id, $deal);
+        $owners = app(HubspotOwnerService::class)->getAllWithIdKey($user_id, $block_id);
+        return $this->getDealVoWithOwner($user_id, $block_id, $deal, $owners);
 
     }
 
@@ -45,23 +58,42 @@ class HubspotDealService extends ApiService
      * @param int $user_id
      * @param int $block_id
      * @param int $hs_contact_id
-     * @return array
+     * @param Meta $meta
+     *
+     * @return Response
+     *
+     * @throws GuzzleException
      * @throws HubspotApiException
-     * @throws UserNotAuthenticatedException|GuzzleException
+     * @throws UserNotAuthenticatedException
      */
-    public function getDeals(int $user_id, int $block_id, int $hs_contact_id): array
+    public function getDeals(int $user_id, int $block_id, int $hs_contact_id, Meta $meta): Response
     {
-        $deals = $this->createApiClient($user_id, $block_id)->getDealsFromContactId($hs_contact_id);
+        $deals = $this->createApiClient($user_id, $block_id)->getDealsFromContactId($hs_contact_id, $meta);
         $owners = app(HubspotOwnerService::class)->getAllWithIdKey($user_id, $block_id);
         $result = [];
-        foreach ($deals as $deal) {
-            $additionalProperties = [];
-            if (isset($owners[$deal->hubspot_owner_id])) {
-                $additionalProperties['owner'] = $owners[$deal->hubspot_owner_id];
-            }
-            $result[] = $this->getDealVOArrayTakingSettings($user_id, $block_id, $deal, $additionalProperties);
+        foreach ($deals->data as $deal) {
+            $result[] = $this->getDealVoWithOwner($user_id, $block_id, $deal, $owners);
         }
-        return $result;
+        return new Response(data: $result, meta: $deals->meta, links: new Links());
+    }
+
+    /**
+     * Получение отфильтрованной сделки с добавлением владельца
+     *
+     * @param int $user_id
+     * @param int $block_id
+     * @param DealDTO $deal
+     * @param array $owners
+     *
+     * @return array
+     */
+    protected function getDealVoWithOwner(int $user_id, int $block_id, DealDTO $deal, array $owners): array
+    {
+        $additionalProperties = [];
+        if (isset($owners[$deal->hubspot_owner_id])) {
+            $additionalProperties['owner'] = $owners[$deal->hubspot_owner_id];
+        }
+        return $this->getDealVOArrayTakingSettings($user_id, $block_id, $deal, $additionalProperties);
     }
 
     /**
@@ -72,7 +104,9 @@ class HubspotDealService extends ApiService
      * @param int $ticket_id
      * @param int $hs_contact_id
      * @param array $dealData
+     *
      * @return array
+     *
      * @throws HubspotApiException
      * @throws UserNotAuthenticatedException|GuzzleException
      */
@@ -88,13 +122,15 @@ class HubspotDealService extends ApiService
 
         $this->hubspotClientRepository->update($block_id, $ticket_id, $hs_contact_id);
         $this->waitForDealConfirm($user_id, $block_id, $newDeal->hs_object_id);
-        return $this->getDealVOArrayTakingSettings($user_id, $block_id, $newDeal);
+        $owners = app(HubspotOwnerService::class)->getAllWithIdKey($user_id, $block_id);
+        return $this->getDealVoWithOwner($user_id, $block_id, $newDeal, $owners);
     }
 
     /**
      * Получение DealDTO из инпутов фронта
      *
      * @param array $dealData
+     *
      * @return DealDTO
      */
     public function getDealDTO(array $dealData): DealDTO
@@ -117,6 +153,7 @@ class HubspotDealService extends ApiService
      * @param int $block_id
      * @param DealDTO $deal
      * @param array $additionalProperties
+     *
      * @return array
      */
     protected function getDealVOArrayTakingSettings(
@@ -136,6 +173,7 @@ class HubspotDealService extends ApiService
      * @param int $user_id
      * @param int $block_id
      * @param int|null $hs_object_id
+     *
      * @return void
      */
     protected function waitForDealConfirm(int $user_id, int $block_id, ?int $hs_object_id): void
@@ -148,5 +186,35 @@ class HubspotDealService extends ApiService
                 sleep(1);
             }
         }
+    }
+
+    /**
+     * Создает Meta из массива с фронта и настроек в БД
+     *
+     * @param int $user_id
+     * @param int $block_id
+     * @param array|null $meta
+     *
+     * @return Meta
+     */
+    public function getDealPaginationMeta(int $user_id, int $block_id, ?array $meta): Meta
+    {
+        $settings = $this->hubspotUserSettingsRepository->scopeDealSettings($user_id, $block_id);
+        $meta = (is_array($meta)) ? $meta : [];
+        $meta['per_page'] = $settings['pagination']['per_page'] ?? self::PAGINATION_PER_PAGE;
+        return new Meta(...$meta);
+    }
+
+    /**
+     * Преобразует метод сортировки полученный с фронта в доступный для сервиса
+     *
+     * @param string|null $sort
+     *
+     * @return string
+     */
+    public function getSort(?string $sort): string
+    {
+        $sort = strtoupper($sort ?? '');
+        return (in_array($sort, self::AVAILABLE_SORTS)) ? $sort : self::SORT_DEFAULT;
     }
 }

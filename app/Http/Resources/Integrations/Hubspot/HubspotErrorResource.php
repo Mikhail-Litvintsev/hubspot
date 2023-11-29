@@ -10,6 +10,7 @@ class HubspotErrorResource extends JsonResource
     /**
      * @param $request
      * @param $response
+     *
      * @return void
      */
     public function withResponse($request, $response)

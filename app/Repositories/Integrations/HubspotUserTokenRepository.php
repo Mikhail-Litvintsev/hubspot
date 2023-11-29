@@ -20,6 +20,7 @@ class HubspotUserTokenRepository
      * @param int $user_id
      * @param int $block_id
      * @param string $code
+     *
      * @return HubspotUserToken
      */
     public function saveCode(int $user_id, int $block_id, string $code): HubspotUserToken
@@ -38,6 +39,7 @@ class HubspotUserTokenRepository
      * @param int $user_id
      * @param int $block_id
      * @param TokenDTO $tokenDTO
+     *
      * @return HubspotUserToken
      */
     public function saveToken(int $user_id, int $block_id, TokenDTO $tokenDTO): HubspotUserToken

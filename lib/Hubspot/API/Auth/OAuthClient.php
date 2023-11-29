@@ -16,6 +16,7 @@ class OAuthClient implements OAuthClientInterface
      * @param string $redirectUrl
      * @param array $scopes
      * @param array $context
+     *
      * @return string
      */
     public function getAuthUrl(string $clientId, string $redirectUrl, array $scopes, array $context = []): string
@@ -33,7 +34,9 @@ class OAuthClient implements OAuthClientInterface
      * Запрос токена в Hubspot
      *
      * @param array $formParams
+     *
      * @return TokenDTO
+     *
      * @throws GuzzleException
      */
     public function requestToken(array $formParams): TokenDTO

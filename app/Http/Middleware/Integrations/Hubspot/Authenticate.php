@@ -13,8 +13,6 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Request as RequestFacade;
 
 class Authenticate
 {
@@ -27,7 +25,9 @@ class Authenticate
      *
      * @param Request $request
      * @param Closure(Request): (Response|RedirectResponse) $next
+     *
      * @return Response|RedirectResponse|JsonResponse
+     *
      * @throws Exception
      */
     public function handle(Request $request, Closure $next): Response|RedirectResponse|JsonResponse

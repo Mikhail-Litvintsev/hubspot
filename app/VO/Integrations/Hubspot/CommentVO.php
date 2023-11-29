@@ -1,16 +1,69 @@
 <?php
 
-namespace App\VO\Integrations\Hubspot;
+declare(strict_types=1);
 
-class CommentVO extends HubspotEntityVO
+namespace App\VO\Channels\VK\Post;
+
+use Carbon\Carbon;
+
+class CommentVO
 {
-    public function __construct(
-        public readonly string $hs_object_id,
-        public readonly string $hs_note_body,
-        public readonly string $hs_createdate,
-        public readonly ?string $hubspot_owner_id,
-        public readonly ?string $hs_lastmodifieddate,
-        public readonly ?string $hs_attachment_ids,
-    ) {
+    /** @var Carbon $date */
+    private $published_at;
+
+    /** @var string $message */
+    private $message;
+
+    /** @var array $attachments */
+    private $attachments;
+
+    /**
+     * CommentVO constructor.
+     *
+     * @param Carbon $published_at
+     * @param string $message
+     * @param array $attachments
+     */
+    protected function __construct(Carbon $published_at, string $message, array $attachments)
+    {
+        $this->message = $message;
+        $this->published_at = $published_at;
+        $this->attachments = $attachments;
+    }
+
+    /**
+     * @param PublishedAtVO $publishedAt
+     * @param string $message
+     * @param array $attachments
+     *
+     * @return CommentVO
+     */
+    public static function create(PublishedAtVO $publishedAt, string $message, array $attachments): CommentVO
+    {
+        return new self($publishedAt->date(), $message, $attachments);
+    }
+
+    /**
+     * @return Carbon
+     */
+    public function publishedAt(): Carbon
+    {
+        return $this->published_at;
+    }
+
+    /**
+     * @return string
+     */
+    public function message(): string
+    {
+        return $this->message;
+    }
+
+    /**
+     * @return array
+     */
+    public function attachments(): array
+    {
+        return $this->attachments;
     }
 }

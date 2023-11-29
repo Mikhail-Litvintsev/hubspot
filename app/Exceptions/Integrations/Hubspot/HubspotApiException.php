@@ -2,10 +2,9 @@
 
 namespace App\Exceptions\Integrations\Hubspot;
 
-use App\Exceptions\BaseException;
 use Throwable;
 
-class HubspotApiException extends BaseException
+class HubspotApiException extends \Exception
 {
     public function __construct($message = "", $code = 0, Throwable $previous = null)
     {

@@ -17,6 +17,5 @@
 @endsection
 @section('scripts')
     <link rel="stylesheet" href="/assets/dist/user/css/hubspot/index/main.min.css" />
-    <script src="/assets/dist/common/jquery/dist/jquery.min.js"></script>
     <script src="/assets/app/user/js/dynamic_blocks/hubspot/index.js"></script>
 @endsection

@@ -16,12 +16,15 @@ class ApiService
     /**
      * @param $user_id
      * @param $block_id
+     *
      * @return ApiClientInterface
+     *
      * @throws UserNotAuthenticatedException|GuzzleException
      */
     protected function createApiClient($user_id, $block_id): ApiClientInterface
     {
-        return app(ApiClientInterface::class,
+        return app(
+            ApiClientInterface::class,
             ['token' => $this->authService->getToken($user_id, $block_id)->access_token]
         );
     }

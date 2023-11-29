@@ -2,6 +2,7 @@
     window.hubspot_index_url = "{{ route('user.integrations.blocks.hubspot.index') }}";
     window.hubspot_contact_create_url = "{{ route('user.integrations.blocks.hubspot.contacts.create') }}";
     window.hubspot_contact_store_url = "{{ route('user.integrations.blocks.hubspot.contacts.store') }}";
+    window.hubspot_contact_link_url = "{{ route('user.integrations.blocks.hubspot.contacts.link') }}";
     window.hubspot_contact_deal_show_url = "{{ route('user.integrations.blocks.hubspot.contact.deal.show') }}";
     window.hubspot_contact_deals_url = "{{ route('user.integrations.blocks.hubspot.contact.deals') }}";
     window.hubspot_contact_deal_create_url = "{{ route('user.integrations.blocks.hubspot.contact.deal.create') }}";

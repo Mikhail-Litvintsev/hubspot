@@ -27,8 +27,7 @@ class AuthService
         protected OAuthClientInterface $authClient,
         protected HubspotSettingsService $settingsService,
         protected HubspotUserTokenRepository $userTokenRepository
-    )
-    {
+    ) {
     }
 
     /**
@@ -36,7 +35,9 @@ class AuthService
      *
      * @param int $user_id
      * @param int $block_id
+     *
      * @return TokenDTO
+     *
      * @throws UserNotAuthenticatedException|GuzzleException
      */
     public function getToken(int $user_id, int $block_id): TokenDTO
@@ -66,6 +67,7 @@ class AuthService
      *
      * @param int $user_id
      * @param int $block_id
+     *
      * @return string
      */
     public function getOAuthUrl(int $user_id, int $block_id): string
@@ -87,6 +89,7 @@ class AuthService
      * @param int $user_id
      * @param int $block_id
      * @param string $code
+     *
      * @return HubspotUserToken
      */
     public function saveCode(int $user_id, int $block_id, string $code): HubspotUserToken
@@ -100,7 +103,9 @@ class AuthService
      * @param int $user_id
      * @param int $block_id
      * @param string $code
+     *
      * @return HubspotUserToken
+     *
      * @throws GuzzleException
      */
     protected function createNewToken(int $user_id, int $block_id, string $code): HubspotUserToken
@@ -121,7 +126,9 @@ class AuthService
      * @param int $user_id
      * @param int $block_id
      * @param TokenDTO $tokenDTO
+     *
      * @return HubspotUserToken
+     *
      * @throws GuzzleException
      */
     protected function refreshToken(int $user_id, int $block_id, TokenDTO $tokenDTO): HubspotUserToken
@@ -142,7 +149,9 @@ class AuthService
      * @param int $user_id
      * @param array $form_params
      * @param int $block_id
+     *
      * @return HubspotUserToken
+     *
      * @throws GuzzleException
      */
     protected function requestAndSaveToken(int $user_id, int $block_id, array $form_params): HubspotUserToken
@@ -157,6 +166,7 @@ class AuthService
      * @param TokenDTO $tokenDTO
      * @param int $user_id
      * @param int $block_id
+     *
      * @return HubspotUserToken
      */
     protected function saveToken(int $user_id, int $block_id, TokenDTO $tokenDTO): HubspotUserToken
@@ -180,6 +190,7 @@ class AuthService
      * Метод для локального теста
      *
      * @param string $url
+     *
      * @return string
      */
     protected function getCorrectUrl(string $url): string

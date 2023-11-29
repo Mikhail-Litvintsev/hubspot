@@ -14,7 +14,7 @@ use HubSpot\Client\Crm\Contacts\Model\Error;
 use HubSpot\Client\Crm\Contacts\Model\Filter;
 use HubSpot\Client\Crm\Contacts\Model\FilterGroup;
 use HubSpot\Client\Crm\Contacts\Model\PublicObjectSearchRequest;
-use HubSpot\Client\Crm\Contacts\Model\SimplePublicObjectInput;
+use HubSpot\Client\Crm\Contacts\Model\SimplePublicObjectInputForCreate as ContactSimplePublicObjectInputForCreate;
 use HubSpot\Client\Crm\Deals\Model\AssociationSpec;
 use HubSpot\Client\Crm\Deals\Model\PublicAssociationsForObject;
 use HubSpot\Client\Crm\Deals\Model\SimplePublicObjectInputForCreate;
@@ -23,10 +23,13 @@ use HubSpot\Discovery\Discovery;
 use HubSpot\Factory;
 use HubSpot\RetryMiddlewareFactory;
 use UseDesk\Hubspot\API\DTO\ContactDTO;
-use UseDesk\Hubspot\API\DTO\DTOFactory;
 use UseDesk\Hubspot\API\DTO\DealDTO;
+use UseDesk\Hubspot\API\DTO\DTOFactory;
 use UseDesk\Hubspot\API\DTO\NoteDTO;
 use UseDesk\Hubspot\API\DTO\OwnerDTO;
+use UseDesk\Hubspot\API\DTO\Pagination\Links;
+use UseDesk\Hubspot\API\DTO\Pagination\Meta;
+use UseDesk\Hubspot\API\DTO\Pagination\Response;
 use UseDesk\Hubspot\API\DTO\PipelineDTO;
 use UseDesk\Hubspot\Book\Book;
 use UseDesk\Hubspot\Book\ObjectTypeIdBook;
@@ -70,6 +73,7 @@ class DiscoveryApiClient implements ApiClientInterface
      * Ищет контакты по email и phones в Hubspot
      *
      * @return ContactDTO[]
+     *
      * @throws HubspotApiException
      */
     public function searchContacts(array $emails, array $phones = []): array
@@ -84,9 +88,11 @@ class DiscoveryApiClient implements ApiClientInterface
             }
             foreach ($phones as $phone) {
                 $phone = $this->preparePhone($phone);
-                $response = $this->searchContactsByPhone($phone);
-                if (isset($response[0])) {
-                    $all = array_merge($all, $response);
+                if ($phone) {
+                    $response = $this->searchContactsByPhone($phone);
+                    if (isset($response[0])) {
+                        $all = array_merge($all, $response);
+                    }
                 }
             }
             $result = [];
@@ -107,6 +113,7 @@ class DiscoveryApiClient implements ApiClientInterface
      * Ищет контакты по email в Hubspot
      *
      * @return ContactDTO[]
+     *
      * @throws HubspotApiException
      */
     public function searchContactsByEmail(string $email): array
@@ -132,6 +139,7 @@ class DiscoveryApiClient implements ApiClientInterface
      * Ищет контакты по phone в Hubspot
      *
      * @return ContactDTO[]
+     *
      * @throws HubspotApiException
      */
     public function searchContactsByPhone(string $phone): array
@@ -157,6 +165,7 @@ class DiscoveryApiClient implements ApiClientInterface
      * Поиск контактов по фильтрам в Hubspot
      *
      * @return ContactDTO[]
+     *
      * @throws HubspotApiException
      */
     protected function searchRequestContacts(array $filters): array
@@ -193,13 +202,15 @@ class DiscoveryApiClient implements ApiClientInterface
      * Поиск контакта по id в Hubspot
      *
      * @param int $hs_contact_id
+     *
      * @return ContactDTO
+     *
      * @throws HubspotApiException
      */
     public function getContactById(int $hs_contact_id): ContactDTO
     {
         try {
-            $apiResponse = $this->hubspot->crm()->contacts()->basicApi()->getById($hs_contact_id, false);
+            $apiResponse = $this->hubspot->crm()->contacts()->basicApi()->getById((string)$hs_contact_id);
             return $this->DTOFactory->create(ContactDTO::class, $apiResponse->getProperties());
         } catch (ApiException  $apiException) {
             $error = [
@@ -213,25 +224,29 @@ class DiscoveryApiClient implements ApiClientInterface
     /**
      * Исправление номера телефона под формат Hubspot, пример +75556667788
      *
-     * @param string $phone
-     * @return string
+     * @param string|null $phone
+     *
+     * @return string|null
      */
-    protected function preparePhone(string $phone): string
+    protected function preparePhone(?string $phone): ?string
     {
-        return '+' . preg_replace('/[^0-9]/', '', $phone);
+        return (!empty($phone)) ? '+' . preg_replace('/[^0-9]/', '', $phone) : null;
     }
 
     /**
      * Создание контакта в Hubspot
      *
      * @param ContactDTO $contact
+     *
      * @return ContactDTO
+     *
      * @throws HubspotApiException
      */
     public function createContact(ContactDTO $contact): ContactDTO
     {
         try {
-            $contactInput = new SimplePublicObjectInput();
+            $contact = $this->prepareContactDTO($contact);
+            $contactInput = new ContactSimplePublicObjectInputForCreate();
             $contactInput->setProperties((array)$contact);
             $contact = $this->hubspot->crm()->contacts()->basicApi()->create($contactInput);
             if ($contact instanceof Error) {
@@ -259,24 +274,40 @@ class DiscoveryApiClient implements ApiClientInterface
     /**
      * Получение всех сделок, связанных с контактом
      *
+     *
      * @param int $hs_contact_id
-     * @return DealDTO []
+     * @param Meta $meta
+     *
+     * @return Response
+     *
      * @throws HubspotApiException
      */
-    public function getDealsFromContactId(int $hs_contact_id = 0): array
+    public function getDealsFromContactId(int $hs_contact_id, Meta $meta): Response
     {
-        $result = [];
-        foreach ($this->getDealsIdFromContactId($hs_contact_id) as $hsDeaId) {
-            $result[] = $this->getDeal($hsDeaId);
+        $deals = [];
+        $dealIds = $this->getDealsIdFromContactId($hs_contact_id);
+
+        arsort($dealIds);
+        $total = count($dealIds);
+
+        $meta = $this->getPaginationMeta($meta, $total);
+
+        $dealIds = array_slice($dealIds, $meta->from, $meta->per_page);
+
+        foreach ($dealIds as $hsDeaId) {
+            $deals[] = $this->getDeal($hsDeaId);
         }
-        return $result;
+
+        return new Response(data: $deals, meta: $meta, links: new Links());
     }
 
     /**
      * Получение всех id сделок, связанных с контактом
      *
      * @param int $hs_contact_id
+     *
      * @return array
+     *
      * @throws HubspotApiException
      */
     protected function getDealsIdFromContactId(int $hs_contact_id): array
@@ -285,7 +316,7 @@ class DiscoveryApiClient implements ApiClientInterface
             $response = $this->hubspot->crm()->associations()->v4()->basicApi()->getPage(
                 Book::CONTACT,
                 $hs_contact_id,
-                ObjectTypeIdBook::DEALS
+                ObjectTypeIdBook::DEALS,
             );
             return array_map(function ($item) {
                 return $item->getToObjectId();
@@ -303,7 +334,9 @@ class DiscoveryApiClient implements ApiClientInterface
      * Поиск сделки по id в Hubspot
      *
      * @param int $hs_deal_id
+     *
      * @return DealDTO
+     *
      * @throws HubspotApiException
      */
     public function getDeal(int $hs_deal_id): DealDTO
@@ -313,7 +346,7 @@ class DiscoveryApiClient implements ApiClientInterface
             $filter
                 ->setOperator('EQ')
                 ->setPropertyName('hs_object_id')
-                ->setValue($hs_deal_id);
+                ->setValue((string)$hs_deal_id);
             $filters[] = $filter;
             $filterGroup = new \HubSpot\Client\Crm\Deals\Model\FilterGroup();
             $filterGroup->setFilters($filters);
@@ -346,18 +379,19 @@ class DiscoveryApiClient implements ApiClientInterface
      * Получить список всех owners в Hubspot
      *
      * @return OwnerDTO []
+     *
      * @throws HubspotApiException
      */
     public function getOwners(): array
     {
         try {
-        $owners = $this->hubspot->crm()->owners()->ownersApi()->getPage()->getResults();
-        $result = [];
+            $owners = $this->hubspot->crm()->owners()->ownersApi()->getPage()->getResults();
+            $result = [];
 
-        foreach ($owners as $owner) {
-            $result[] = $this->DTOFactory->create(OwnerDTO::class, (array)$owner->jsonSerialize());
-        }
-        return $result;
+            foreach ($owners as $owner) {
+                $result[] = $this->DTOFactory->create(OwnerDTO::class, (array)$owner->jsonSerialize());
+            }
+            return $result;
         } catch (\HubSpot\Client\Crm\Owners\ApiException $apiException) {
             $error = [
                 'message' => $apiException->getMessage(),
@@ -376,6 +410,7 @@ class DiscoveryApiClient implements ApiClientInterface
      * Получить список всех Deal Pipelines в аккаунте Hubspot
      *
      * @return PipelineDTO []
+     *
      * @throws HubspotApiException
      */
     public function getDealPipelines(): array
@@ -406,7 +441,9 @@ class DiscoveryApiClient implements ApiClientInterface
      *
      * @param DealDTO $dealDTO
      * @param int $hs_contact_id
+     *
      * @return DealDTO
+     *
      * @throws HubspotApiException
      */
     public function createDeal(DealDTO $dealDTO, int $hs_contact_id): DealDTO
@@ -433,7 +470,6 @@ class DiscoveryApiClient implements ApiClientInterface
         } catch (\HubSpot\Client\Crm\Deals\ApiException|Exception $apiException) {
             $error = [
                 'message' => $apiException->getMessage(),
-                'responseBody' => $apiException->getResponseBody()
             ];
         }
         throw new HubspotApiException(json_encode($error));
@@ -443,17 +479,28 @@ class DiscoveryApiClient implements ApiClientInterface
      * Получить заметки, связанные со сделкой
      *
      * @param int $hs_deal_id
-     * @param string|null $sort
-     * @return NoteDTO []
+     * @param string $sort
+     * @param Meta $meta
+     *
+     * @return Response
+     *
      * @throws HubspotApiException
      */
-    public function getNotes(int $hs_deal_id, ?string $sort = null): array
+    public function getNotes(int $hs_deal_id, string $sort, Meta $meta): Response
     {
         try {
             $ids = $this->getNoteIdsFromDealId($hs_deal_id);
             if (empty($ids)) {
-                return [];
+                return new Response([], new Meta(1), new Links());
             }
+            if ($sort === 'DESC') {
+                arsort($ids);
+            }
+            $total = count($ids);
+            $meta = $this->getPaginationMeta($meta, $total);
+
+            $ids = array_slice($ids, $meta->from, $meta->per_page);
+
             $properties = [
                 'hs_note_body',
                 'hs_lastmodifieddate',
@@ -474,7 +521,6 @@ class DiscoveryApiClient implements ApiClientInterface
             $publicObjectSearchRequest = new \HubSpot\Client\Crm\Objects\Notes\Model\PublicObjectSearchRequest([
                 'filter_groups' => [$filterGroup],
                 'properties' => $properties,
-                'limit' => 5,
                 'after' => 0,
             ]);
             $apiResponse = $this->hubspot->crm()->objects()->notes()->searchApi()->doSearch(
@@ -482,9 +528,14 @@ class DiscoveryApiClient implements ApiClientInterface
             )->getResults();
             $notes = [];
             foreach ($apiResponse as $result) {
-                $notes[] = $this->DTOFactory->create(NoteDTO::class, $result->getProperties());
+                /** @var NoteDTO $note */
+                $note = $this->DTOFactory->create(NoteDTO::class, $result->getProperties());
+                $notes[$note->hs_object_id] = $note;
             }
-            return $notes;
+            if ($sort === 'DESC') {
+                krsort($notes);
+            }
+            return new Response($notes, $meta, new Links());
         } catch (\HubSpot\Client\Crm\Objects\Notes\ApiException $apiException) {
             $error = [
                 'message' => $apiException->getMessage(),
@@ -502,7 +553,9 @@ class DiscoveryApiClient implements ApiClientInterface
      * Получить список id заметок, связанных со сделкой
      *
      * @param int $hs_deal_id
+     *
      * @return array
+     *
      * @throws HubspotApiException
      */
     protected function getNoteIdsFromDealId(int $hs_deal_id): array
@@ -533,5 +586,40 @@ class DiscoveryApiClient implements ApiClientInterface
             ];
         }
         throw new HubspotApiException(json_encode($error));
+    }
+
+    /**
+     * Форматирует данные перед отправкой
+     *
+     * @param ContactDTO $contact
+     *
+     * @return ContactDTO
+     */
+    protected function prepareContactDTO(ContactDTO $contact): ContactDTO
+    {
+        $data = (array)$contact;
+        $data['phone'] = $this->preparePhone($contact->phone);
+        return new ContactDTO(...$data);
+    }
+
+    /**
+     * Исправляет параметры в Meta в зависимости от нового количества записей (total)
+     *
+     * @param Meta $meta
+     * @param int $total
+     *
+     * @return Meta
+     */
+    protected function getPaginationMeta(Meta $meta, int $total): Meta
+    {
+        $per_page = $meta->per_page;
+        $current_page = $meta->current_page;
+        $last_page = (int)ceil($total / $per_page);
+        $from = ($current_page - 1) * $per_page;
+        if ($total <= $from) {
+            $current_page = $last_page;
+            $from = ($current_page - 1) * $per_page;
+        }
+        return new Meta(per_page: $per_page, current_page: $current_page, from: $from, last_page: $last_page, to: $total, total: $total);
     }
 }

@@ -18,6 +18,7 @@ class HubspotDealSettingsService
      * @param int $user_id
      * @param int $block_id
      * @param array $data
+     *
      * @return array
      */
     public function updateDealSettings(int $user_id, int $block_id, array $data): array
@@ -33,6 +34,7 @@ class HubspotDealSettingsService
      *
      * @param int $user_id
      * @param int $block_id
+     *
      * @return array
      */
     public function getDealSettings(int $user_id, int $block_id): array

@@ -39,7 +39,7 @@ class DealSettingsRequest extends FormRequest
         $attributes = (new DealVO())->getOptionalAttributes();
         $deal_settings = [];
         foreach ($attributes as $attribute) {
-            if ($this?->$attribute === 'true') {
+            if (($this->$attribute ?? '') === 'true') {
                 $deal_settings[] = $attribute;
             }
         }

@@ -12,6 +12,7 @@ interface OAuthClientInterface
      * @param string $redirectUrl
      * @param array $scopes
      * @param array $context
+     *
      * @return string
      */
     public const REQUEST_OAUTH_TOKEN_URL = 'https://api.hubapi.com/oauth/v1/token';
@@ -19,7 +20,9 @@ interface OAuthClientInterface
 
     /**
      * @param array $formParams
+     *
      * @return TokenDTO
+     *
      * @throws GuzzleException
      */
     public function requestToken(array $formParams): TokenDTO;

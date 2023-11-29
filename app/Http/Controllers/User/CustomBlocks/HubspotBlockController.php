@@ -7,6 +7,7 @@ use App\Exceptions\Integrations\Hubspot\UserNotAuthenticatedException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Integrations\Hubspot\ContactDealRequest;
 use App\Http\Requests\Integrations\Hubspot\DealSettingsRequest;
+use App\Http\Requests\Integrations\Hubspot\StoreContactRequest;
 use App\Http\Requests\Request;
 use App\Http\Resources\Integrations\Hubspot\HubspotErrorResource;
 use App\Http\Resources\Integrations\Hubspot\HubspotSuccessResource;
@@ -26,13 +27,13 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Request as RequestFacade;
 use UseDesk\Hubspot\Book\Book;
 
-
 class HubspotBlockController extends Controller
 {
     /**
      * Кнопка авторизации в Hubspot
      *
      * @param Request $request
+     *
      * @return Application|Factory|View
      */
     public function auth(Request $request): View|Factory|Application
@@ -46,6 +47,7 @@ class HubspotBlockController extends Controller
      *
      * @param AuthService $authService
      * @param Request $request
+     *
      * @return Factory|View|Application
      */
     public function redirect(AuthService $authService, Request $request): Factory|View|Application
@@ -75,22 +77,24 @@ class HubspotBlockController extends Controller
      * Главная (после авторизации)
      *
      * @param IndexParams $paramsService
+     * @param Request $request
+     *
      * @return JsonResource
      */
-    public function index(IndexParams $paramsService): JsonResource
+    public function index(IndexParams $paramsService, Request $request): JsonResource
     {
         try {
             $params = $paramsService->getForIndexByRequest(
                 Auth::user()->id,
-                RequestFacade::input('block_id'),
-                RequestFacade::all()
+                $request->input('block_id'),
+                $request->all()
             );
 
             $html = $this->getRenderView('user.custom_blocks.hubspot.index', $params);
             return new HubspotSuccessResource(compact('html'));
         } catch (HubspotApiException|UserNotAuthenticatedException|Exception|GuzzleException $exception) {
             app(SystemLoggingService::class)->logErrorToChannel('hubspot_integration', $exception);
-            $errors = [trans('Error') => trans('Can not get contacts')];
+            $errors = [trans('text.hubspot.error') => trans('text.hubspot.universal_error')];
             return new HubspotErrorResource(compact('errors'));
         }
     }
@@ -99,6 +103,7 @@ class HubspotBlockController extends Controller
      * Форма создания контакта в Hubspot
      *
      * @param HubspotContactService $contactService
+     *
      * @return JsonResource
      */
     public function createContact(HubspotContactService $contactService): JsonResource
@@ -109,7 +114,7 @@ class HubspotBlockController extends Controller
             return new HubspotSuccessResource(compact('html'));
         } catch (Exception $exception) {
             app(SystemLoggingService::class)->logErrorToChannel('hubspot_integration', $exception);
-            $errors = [trans('Error') => trans('Can not create contact')];
+            $errors = [trans('text.hubspot.error') => trans('text.hubspot.universal_error')];
             return new HubspotErrorResource(compact('errors'));
         }
 
@@ -119,10 +124,11 @@ class HubspotBlockController extends Controller
      * Сохранение контакта в Hubspot
      *
      * @param IndexParams $paramsService
-     * @param Request $request
+     * @param StoreContactRequest $request
+     *
      * @return JsonResource
      */
-    public function storeContact(IndexParams $paramsService, Request $request): JsonResource
+    public function storeContact(IndexParams $paramsService, StoreContactRequest $request): JsonResource
     {
         try {
             $params = $paramsService->getForIndexWithNewContact(
@@ -133,39 +139,65 @@ class HubspotBlockController extends Controller
             $html = $this->getRenderView('user.custom_blocks.hubspot.index', $params);
             return new HubspotSuccessResource(compact('html'));
         } catch (HubspotApiException $exception) {
-            app(SystemLoggingService::class)->logErrorToChannel('hubspot_integration', $exception);
-            $errorMessage = trans('Can not create contact with this email');
-        } catch (UserNotAuthenticatedException $exception) {
-            app(SystemLoggingService::class)->logErrorToChannel('hubspot_integration', $exception);
-            $errorMessage = trans('Connection error');
+            app(SystemLoggingService::class)->logErrorToChannel('hubspot_integration', $exception->getMessage());
+            $errorMessage = mb_strtolower(trans('text.hubspot.contact_already_exists'));
+        } catch (UserNotAuthenticatedException|GuzzleException $exception) {
+            app(SystemLoggingService::class)->logErrorToChannel('hubspot_integration', $exception->getMessage());
+            $errorMessage = mb_strtolower(trans('text.hubspot.universal_error'));
         }
 
-        $errors = [trans('Error') => $errorMessage];
+        $errors = [trans('text.hubspot.error') => $errorMessage];
         return new HubspotErrorResource(compact('errors'));
 
+    }
+
+    /**
+     * @param IndexParams $paramsService
+     * @param Request $request
+     *
+     * @return JsonResource
+     */
+    public function linkContact(IndexParams $paramsService, Request $request): JsonResource
+    {
+        try {
+            $params = $paramsService->getForIndexAfterLinkContact(
+                Auth::user()->id,
+                $request->all()
+            );
+            $html = $this->getRenderView('user.custom_blocks.hubspot.index', $params);
+            return new HubspotSuccessResource(compact('html'));
+        } catch (GuzzleException|HubspotApiException|UserNotAuthenticatedException $exception) {
+            app(SystemLoggingService::class)->logErrorToChannel('hubspot_integration', $exception);
+            $errorMessage = trans('text.hubspot.universal_error');
+        }
+        $errors = [trans('text.hubspot.error') => $errorMessage];
+        return new HubspotErrorResource(compact('errors'));
     }
 
     /**
      * Список сделок, связанных с контактом
      *
      * @param ContactDealsParams $paramsService
+     * @param Request $request
+     *
      * @return JsonResource
      */
-    public function contactDeals(ContactDealsParams $paramsService): JsonResource
+    public function contactDeals(ContactDealsParams $paramsService, Request $request): JsonResource
     {
         try {
             $params = $paramsService->getForContactDeals(
                 Auth::user()->id,
-                RequestFacade::input('block_id'),
-                RequestFacade::input('ticket_id'),
-                RequestFacade::input('hs_contact_id')
+                $request->input('block_id'),
+                $request->input('ticket_id'),
+                $request->input('hs_contact_id'),
+                $request->input('meta'),
             );
 
             $html = $this->getRenderView('user.custom_blocks.hubspot.deals', $params);
             return new HubspotSuccessResource(compact('html'));
         } catch (UserNotAuthenticatedException|HubspotApiException|GuzzleException $exception) {
             app(SystemLoggingService::class)->logErrorToChannel('hubspot_integration', $exception);
-            $errors = [trans('Error') => trans('Can not get deals')];
+            $errors = [trans('text.hubspot.error') => trans('text.hubspot.universal_error')];
             return new HubspotErrorResource(compact('errors'));
         }
     }
@@ -174,7 +206,9 @@ class HubspotBlockController extends Controller
      * Форма создания сделки, связанной с контактом
      *
      * @param ContactDealsParams $paramsService
+     *
      * @return JsonResource
+     *
      * @throws GuzzleException
      */
     public function contactDealCreate(ContactDealsParams $paramsService): JsonResource
@@ -190,7 +224,7 @@ class HubspotBlockController extends Controller
             return new HubspotSuccessResource(compact('html'));
         } catch (HubspotApiException|UserNotAuthenticatedException $exception) {
             app(SystemLoggingService::class)->logErrorToChannel('hubspot_integration', $exception);
-            $errors = [trans('Error') => trans('Can not create deal')];
+            $errors = [trans('text.hubspot.error') => trans('text.hubspot.universal_error')];
             return new HubspotErrorResource(compact('errors'));
         }
     }
@@ -200,6 +234,7 @@ class HubspotBlockController extends Controller
      *
      * @param ContactDealsParams $paramsService
      * @param ContactDealRequest $request
+     *
      * @return JsonResource
      */
     public function contactDealStore(ContactDealsParams $paramsService, ContactDealRequest $request): JsonResource
@@ -216,7 +251,7 @@ class HubspotBlockController extends Controller
             return new HubspotSuccessResource(compact('html'));
         } catch (GuzzleException|HubspotApiException|UserNotAuthenticatedException $exception) {
             app(SystemLoggingService::class)->logErrorToChannel('hubspot_integration', $exception);
-            $errors = [trans('Error') => trans('Can not create deal')];
+            $errors = [trans('text.hubspot.error') => trans('text.hubspot.universal_error')];
             return new HubspotErrorResource(compact('errors'));
         }
     }
@@ -225,26 +260,30 @@ class HubspotBlockController extends Controller
      * Детали сделки, связанной с контактом
      *
      * @param ContactDealsParams $paramsService
+     * @param Request $request
+     *
      * @return JsonResource
      */
-    public function contactDealShow(ContactDealsParams $paramsService): JsonResource
+    public function contactDealShow(ContactDealsParams $paramsService, Request $request): JsonResource
     {
         try {
             $params = $paramsService->getForContactDealShow(
                 Auth::user()->id,
-                RequestFacade::input('block_id'),
-                RequestFacade::input('hs_deal_id'),
-                RequestFacade::input('hs_contact_id')
+                $request->input('block_id'),
+                $request->input('hs_deal_id'),
+                $request->input('hs_contact_id'),
+                $request->input('sort'),
+                $request->input('meta'),
             );
-
             $html = $this->getRenderView(
-                    'user.custom_blocks.hubspot.show_deal', $params
+                'user.custom_blocks.hubspot.show_deal',
+                $params
             );
             return new HubspotSuccessResource(compact('html'));
 
         } catch (GuzzleException|HubspotApiException|UserNotAuthenticatedException|Exception $exception) {
             app(SystemLoggingService::class)->logErrorToChannel('hubspot_integration', $exception);
-            $errors = [trans('Error') => trans('Can not show deal')];
+            $errors = [trans('text.hubspot.error') => trans('text.hubspot.universal_error')];
             return new HubspotErrorResource(compact('errors'));
         }
     }
@@ -254,13 +293,13 @@ class HubspotBlockController extends Controller
      *
      * @param DealSettingsParams $paramsService
      * @param Request $request
+     *
      * @return HubspotSuccessResource|HubspotErrorResource
      */
     public function editDealSettings(
         DealSettingsParams $paramsService,
         Request $request
-    ): HubspotSuccessResource|HubspotErrorResource
-    {
+    ): HubspotSuccessResource|HubspotErrorResource {
         try {
             $params = $paramsService->getForEdit(
                 Auth::user()->id,
@@ -268,13 +307,14 @@ class HubspotBlockController extends Controller
                 $request->input('hs_contact_id'),
             );
             $html = $this->getRenderView(
-                'user.custom_blocks.hubspot.edit_deal_settings', $params
+                'user.custom_blocks.hubspot.edit_deal_settings',
+                $params
             );
             return new HubspotSuccessResource(compact('html'));
 
         } catch (Exception $exception) {
             app(SystemLoggingService::class)->logErrorToChannel('hubspot_integration', $exception);
-            $errors = [trans('Error') => trans('Can not show deal settings')];
+            $errors = [trans('text.hubspot.error') => trans('text.hubspot.universal_error')];
             return new HubspotErrorResource(compact('errors'));
         }
     }
@@ -284,6 +324,7 @@ class HubspotBlockController extends Controller
      *
      * @param DealSettingsParams $paramsService
      * @param DealSettingsRequest $request
+     *
      * @return HubspotSuccessResource|HubspotErrorResource
      */
     public function updateDealSettings(DealSettingsParams $paramsService, DealSettingsRequest $request): HubspotSuccessResource|HubspotErrorResource
@@ -304,18 +345,20 @@ class HubspotBlockController extends Controller
             return new HubspotSuccessResource(compact('html'));
         } catch (GuzzleException|HubspotApiException|UserNotAuthenticatedException $exception) {
             app(SystemLoggingService::class)->logErrorToChannel('hubspot_integration', $exception);
-            $errors = [trans('Error') => trans('Can not update deal settings')];
+            $errors = [trans('text.hubspot.error') => trans('text.hubspot.universal_error')];
             return new HubspotErrorResource(compact('errors'));
         }
     }
+
     /**
      * Отрисовка html с обязательными параметрами
      *
      * @param string $name
-     * @param $params
+     * @param array $params
+     *
      * @return string
      */
-    protected function getRenderView(string $name, $params = []): string
+    protected function getRenderView(string $name, array $params = []): string
     {
         $params['ticket_id'] = RequestFacade::input('ticket_id');
         return view($name, $params)->render();
